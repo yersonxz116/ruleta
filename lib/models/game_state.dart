@@ -1,4 +1,4 @@
-import 'dart:math';
+import 'dart:math' as math;
 import 'user.dart';
 
 class GameState {
@@ -18,7 +18,7 @@ class GameState {
   int numBullets = 1;
   
   // Posición del cañón (0 = apunta a user1, 1 = apunta a user2)
-  // Solo hay dos posiciones posibles: 90 grados (posición 0) y 270 grados (posición 1)
+  // Solo hay dos posiciones posibles: 0 grados (arriba, posición 0) y 180 grados (abajo, posición 1)
   int canonPosition = 0;
   
   GameState({
@@ -42,7 +42,7 @@ class GameState {
     }
     
     // Colocar balas aleatorias según el número configurado
-    final random = Random();
+    final random = math.Random();
     List<int> positions = List.generate(6, (index) => index);
     positions.shuffle(random); // Mezclar posiciones aleatoriamente
     
@@ -55,18 +55,18 @@ class GameState {
     currentChamberPosition = 0; // Siempre empezar desde la posición 0
     
     // Posición inicial del cañón aleatoria (0 o 1)
-    canonPosition = random.nextInt(2); // 0 = 90 grados (derecha), 1 = 270 grados (izquierda)
+    canonPosition = random.nextInt(2); // 0 = 0 grados (arriba), 1 = 180 grados (abajo)
   }
   
   // Girar el tambor a una posición aleatoria y el cañón
   void spin() {
-    final random = Random();
+    final random = math.Random();
     // Avanzar a una posición aleatoria entre 1 y 5 posiciones
     int steps = random.nextInt(5) + 1;
     currentChamberPosition = (currentChamberPosition + steps) % 6;
     
     // Cambiar aleatoriamente a quién apunta el cañón (solo 2 posiciones)
-    canonPosition = random.nextInt(2); // 0 = 90 grados (derecha), 1 = 270 grados (izquierda)
+    canonPosition = random.nextInt(2); // 0 = 0 grados (arriba), 1 = 180 grados (abajo)
   }
   
   // Verificar si hay una bala en la posición actual
@@ -90,7 +90,17 @@ class GameState {
   }
   
   // Obtener el ángulo de rotación del cañón en radianes
+  // En Flutter, RotationTransition usa 'turns' donde 1.0 = 360 grados
+  // 0.0 = 0 grados (arriba), 0.5 = 180 grados (abajo)
   double getCanonAngle() {
-    return canonPosition == 0 ? 1.5708 : 4.71239; // PI/2 (90 grados) o 3*PI/2 (270 grados)
+    return canonPosition == 0 ? 0.0 : 0.5; // 0 grados (arriba) o 180 grados (abajo)
+  }
+  
+  // Disparar el revólver y verificar si hay una bala en la posición actual
+  bool shoot() {
+    bool hasBullet = hasBulletInCurrentPosition();
+    // Después de disparar, avanzamos a la siguiente posición
+    moveToNextChamberPosition();
+    return hasBullet;
   }
 }

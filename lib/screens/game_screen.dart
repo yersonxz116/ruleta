@@ -5,13 +5,18 @@ import '../models/game_state.dart';
 import '../models/questions/question.dart';
 import '../models/questions/question_repository.dart';
 import 'user_profile_screen.dart';
-import 'bullet_selection_dialog.dart';
 
 class GameScreen extends StatefulWidget {
   final User user1;
   final User user2;
+  final int bullets; // Nuevo parámetro para las balas
 
-  const GameScreen({Key? key, required this.user1, required this.user2}) : super(key: key);
+  const GameScreen({
+    Key? key, 
+    required this.user1, 
+    required this.user2,
+    required this.bullets, // Requerido
+  }) : super(key: key);
 
   @override
   _GameScreenState createState() => _GameScreenState();
@@ -57,20 +62,8 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       ),
     );
     
-    // Mostrar diu00e1logo de selecciu00f3n de balas despuu00e9s de que se construya el widget
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => BulletSelectionDialog(
-          onBulletsSelected: (bullets) {
-            setState(() {
-              gameState.initChamber(bullets);
-            });
-          },
-        ),
-      );
-    });
+    // Inicializar el tambor con el número de balas seleccionado
+    gameState.initChamber(widget.bullets);
   }
 
   void girarRevolver() {
@@ -83,12 +76,12 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       gameState.spin();
 
       // Calcular el ángulo de rotación para el tambor
-      double vueltasCompletas = 3 * 2 * math.pi; // 3 vueltas completas
+      double vueltasCompletas = 3.0; // 3 vueltas completas
       
-      // Ángulo final del cañón (90 o 270 grados)
+      // Ángulo final del cañón (0 o 0.5 vueltas)
       double canonFinalAngle = gameState.getCanonAngle();
       
-      // El ángulo final debe ser un múltiplo exacto de 90 grados (90 o 270)
+      // El ángulo final debe ser 0 (arriba) o 0.5 (abajo) vueltas
       // Añadimos las vueltas completas al ángulo final del cañón
       double targetAngle = vueltasCompletas + canonFinalAngle;
 
@@ -123,7 +116,7 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       questionAnsweredCorrectly = null;
     });
     
-    // Obtener el usuario al que apunta el cau00f1u00f3n
+    // Obtener el usuario al que apunta el cañón
     User targetUser = gameState.getTargetUser();
     
     showDialog(
@@ -159,8 +152,8 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                   padding: const EdgeInsets.only(top: 16.0),
                   child: Text(
                     questionAnsweredCorrectly! 
-                        ? 'u00a1Respuesta correcta!' 
-                        : 'u00a1Respuesta incorrecta!',
+                        ? '¡Respuesta correcta!' 
+                        : '¡Respuesta incorrecta!',
                     style: TextStyle(
                       color: questionAnsweredCorrectly! ? Colors.green : Colors.red,
                       fontWeight: FontWeight.bold,
@@ -188,12 +181,12 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                       showingQuestion = false;
                     });
                     
-                    // Decidir quu00e9 hacer segu00fan la respuesta
+                    // Decidir qué hacer según la respuesta
                     if (isCorrect) {
-                      // Si responde correctamente, puede elegir disparar a su00ed mismo o al oponente
+                      // Si responde correctamente, puede elegir disparar a sí mismo o al oponente
                       mostrarOpcionesDisparo(targetUser);
                     } else {
-                      // Si responde incorrectamente, debe dispararse a su00ed mismo
+                      // Si responde incorrectamente, debe dispararse a sí mismo
                       dispararRevolver(targetUser: targetUser);
                     }
                   });
@@ -208,12 +201,12 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                     showingQuestion = false;
                   });
                   
-                  // Decidir quu00e9 hacer segu00fan la respuesta
+                  // Decidir qué hacer según la respuesta
                   if (questionAnsweredCorrectly!) {
-                    // Si responde correctamente, puede elegir disparar a su00ed mismo o al oponente
+                    // Si responde correctamente, puede elegir disparar a sí mismo o al oponente
                     mostrarOpcionesDisparo(targetUser);
                   } else {
-                    // Si responde incorrectamente, debe dispararse a su00ed mismo
+                    // Si responde incorrectamente, debe dispararse a sí mismo
                     dispararRevolver(targetUser: targetUser);
                   }
                 },
@@ -232,16 +225,16 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Text('u00a1Respuesta correcta!'),
-        content: Text('${targetUser.name}, puedes elegir a quiu00e9n disparar:'),
+        title: Text('¡Respuesta correcta!'),
+        content: Text('${targetUser.name}, puedes elegir a quién disparar:'),
         actions: [
           ElevatedButton(
             onPressed: () {
               Navigator.of(context).pop();
-              // Disparar a su00ed mismo
+              // Disparar a sí mismo
               dispararRevolver(targetUser: targetUser);
             },
-            child: Text('Disparar a mu00ed mismo'),
+            child: Text('Disparar a mí mismo'),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
           ),
           ElevatedButton(
@@ -258,9 +251,89 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     );
   }
 
+  void dispararRevolver({required User targetUser}) {
+    if (!gameState.isSpinning && !gameState.isShooting) {
+      setState(() {
+        gameState.isShooting = true;
+      });
+
+      // Simular el disparo
+      _controller.reset();
+      _controller.duration = Duration(milliseconds: 500);
+      
+      _controller.forward().then((_) {
+        // Verificar si hay una bala en la recámara
+        bool hasBullet = gameState.shoot();
+        
+        setState(() {
+          gameState.isShooting = false;
+          
+          if (hasBullet) {
+            // Si hay bala, el usuario pierde una vida
+            targetUser.lives--;
+            
+            // Verificar si el juego ha terminado
+            if (targetUser.lives <= 0) {
+              // El usuario ha perdido
+              User winner = targetUser == widget.user1 ? widget.user2 : widget.user1;
+              winner.wins++;
+              targetUser.losses++;
+              
+              // Mostrar mensaje de fin de juego
+              mostrarFinJuego(winner);
+            }
+          }
+        });
+      });
+    }
+  }
+
+  void mostrarFinJuego(User winner) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('¡Fin del juego!'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('¡${winner.name} ha ganado!'),
+            SizedBox(height: 20),
+            Text('Estadísticas:'),
+            SizedBox(height: 10),
+            Text('${widget.user1.name}: ${widget.user1.wins} victorias, ${widget.user1.losses} derrotas'),
+            Text('${widget.user2.name}: ${widget.user2.wins} victorias, ${widget.user2.losses} derrotas'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).pop(); // Volver al menú principal
+            },
+            child: Text('Volver al menú'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Reiniciar el juego
+              setState(() {
+                widget.user1.lives = 2;
+                widget.user2.lives = 2;
+                gameState = GameState(user1: widget.user1, user2: widget.user2);
+                gameState.initChamber(widget.bullets);
+              });
+            },
+            child: Text('Jugar de nuevo'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Obtener el usuario al que apunta el cau00f1u00f3n
+    // Obtener el usuario al que apunta el cañón
     User targetUser = gameState.getTargetUser();
     
     return Scaffold(
@@ -303,117 +376,72 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
               children: [
                 Text(
                   '${widget.user1.name}: ',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                for (int i = 0; i < widget.user1.maxLives; i++)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                    child: Icon(
-                      i < widget.user1.lives ? Icons.favorite : Icons.favorite_border,
-                      color: widget.user1.heartColor,
-                      size: 24,
-                    ),
-                  ),
+                ...List.generate(2, (index) {
+                  return Icon(
+                    Icons.favorite,
+                    color: index < widget.user1.lives ? widget.user1.heartColor : Colors.grey,
+                    size: 30,
+                  );
+                }),
               ],
             ),
-            
+            SizedBox(height: 10),
             // Vidas del Usuario 2
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   '${widget.user2.name}: ',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                for (int i = 0; i < widget.user2.maxLives; i++)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                    child: Icon(
-                      i < widget.user2.lives ? Icons.favorite : Icons.favorite_border,
-                      color: widget.user2.heartColor,
-                      size: 24,
-                    ),
-                  ),
-              ],
-            ),
-            
-            SizedBox(height: 20),
-            
-            // Mostrar a quiu00e9n apunta el cau00f1u00f3n
-            Text(
-              'Cau00f1u00f3n apuntando a: ${targetUser.name}',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 20),
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                return Transform.translate(
-                  offset: gameState.isShooting 
-                      ? Offset(-30 * _shootingAnimation.value.clamp(0.0, 1.0), 0) 
-                      : Offset.zero,
-                  child: Transform.rotate(
-                    angle: _rotationAnimation.value,
-                    child: Image.asset(
-                      'assets/revolver.png',
-                      width: 200,
-                      height: 200,
-                    ),
-                  ),
-                );
-              },
-            ),
-            if (gameState.isShooting)
-              AnimatedBuilder(
-                animation: _shootingAnimation,
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: _shootingAnimation.value.clamp(0.0, 1.0),
-                    child: Container(
-                      margin: EdgeInsets.only(left: 180),
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          colors: [
-                            Colors.yellow,
-                            Colors.orange,
-                            Colors.red.withOpacity(0.0),
-                          ],
-                          stops: [0.2, 0.5, 1.0],
-                        ),
-                      ),
-                    ),
+                ...List.generate(2, (index) {
+                  return Icon(
+                    Icons.favorite,
+                    color: index < widget.user2.lives ? widget.user2.heartColor : Colors.grey,
+                    size: 30,
                   );
-                },
-              ),
+                }),
+              ],
+            ),
             SizedBox(height: 40),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            // Revólver
+            Stack(
+              alignment: Alignment.center,
               children: [
-                ElevatedButton(
-                  onPressed: (gameState.isSpinning || gameState.isShooting || showingQuestion) 
-                      ? null 
-                      : girarRevolver,
-                  child: Text(gameState.isSpinning ? 'Girando...' : 'Girar Tambor'),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                // Tambor del revólver
+                RotationTransition(
+                  turns: _rotationAnimation,
+                  child: Image.asset(
+                    'assets/img/revolver.png',
+                    width: 200,
+                    height: 200,
                   ),
                 ),
               ],
             ),
-            
-            // Mostrar informaciu00f3n sobre el tambor (para depuraciu00f3n)
             SizedBox(height: 20),
-            Text('Posiciu00f3n actual: ${gameState.currentChamberPosition + 1}/6',
-                style: TextStyle(fontSize: 14, color: Colors.grey)),
-            Text(
-              'Balas: ' + gameState.chamber.map((hasBullet) => hasBullet ? 'u2022' : 'o').join(' '),
-              style: TextStyle(fontSize: 14, color: Colors.grey, fontFamily: 'monospace'),
+            // Indicador de turno
+            Container(
+              padding: EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: targetUser == widget.user1 ? widget.user1.heartColor : widget.user2.heartColor,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Turno de ${targetUser.name}',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
             ),
-            Text(
-              'Nu00famero de balas: ${gameState.numBullets}',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+            SizedBox(height: 40),
+            // Botón para girar
+            ElevatedButton(
+              onPressed: gameState.isSpinning || gameState.isShooting || showingQuestion ? null : girarRevolver,
+              child: Text('Girar Tambor'),
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              ),
             ),
           ],
         ),
@@ -425,119 +453,5 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-  
-  void dispararRevolver({required User targetUser}) {
-    setState(() {
-      gameState.isShooting = true;
-    });
-    
-    // Configurar la animaciu00f3n de disparo
-    _controller.reset();
-    _controller.duration = Duration(milliseconds: 800);
-    
-    // Reiniciar la animaciu00f3n de disparo
-    _shootingAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Interval(0.0, 0.8, curve: Curves.easeOut),
-      ),
-    );
-    
-    _controller.forward().then((_) {
-      setState(() {
-        gameState.isShooting = false;
-        
-        // Verificar si hay bala en la posiciu00f3n actual
-        bool disparado = gameState.hasBulletInCurrentPosition();
-        
-        mostrarResultado(disparado, targetUser);
-      });
-    });
-  }
-  
-  void mostrarResultado(bool disparado, User targetUser) {
-    User otherUser = targetUser == widget.user1 ? widget.user2 : widget.user1;
-    bool gameOver = false;
-    
-    if (disparado) {
-      // El usuario objetivo pierde una vida
-      gameOver = targetUser.loseLife();
-      
-      if (gameOver) {
-        // Si se quedu00f3 sin vidas, pierde el juego
-        targetUser.addLoss();
-        otherUser.addWin();
-      }
-    }
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Text(disparado ? 'u00a1BANG!' : 'Click...'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(disparado 
-                ? gameOver 
-                    ? '${targetUser.name} ha perdido todas sus vidas' 
-                    : '${targetUser.name} ha perdido una vida' 
-                : 'El arma no tenu00eda bala en esta posiciu00f3n'),
-            SizedBox(height: 10),
-            if (disparado) Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (int i = 0; i < targetUser.maxLives; i++)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                    child: Icon(
-                      i < targetUser.lives ? Icons.favorite : Icons.favorite_border,
-                      color: targetUser.heartColor,
-                      size: 24,
-                    ),
-                  ),
-              ],
-            ),
-            SizedBox(height: 10),
-            if (gameOver)
-              Text('Fin del juego', style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              if (gameOver) {
-                // Reiniciar juego
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (context) => BulletSelectionDialog(
-                    onBulletsSelected: (bullets) {
-                      setState(() {
-                        // Reiniciar vidas
-                        widget.user1.resetLives();
-                        widget.user2.resetLives();
-                        
-                        // Inicializar el tambor con el nu00famero de balas seleccionado
-                        gameState.initChamber(bullets);
-                      });
-                    },
-                  ),
-                );
-              } else {
-                // Avanzar a la siguiente posiciu00f3n del tambor
-                gameState.moveToNextChamberPosition();
-              }
-            },
-            child: Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 }
